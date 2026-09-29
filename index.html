@@ -440,10 +440,16 @@ function linkedinBody(f, m) {
     ${failedNote(m)}`;
 }
 
+// "Not connected" campaigns are explained elsewhere, so they're left out here.
+// A stale entry means the refresh fell back to the last good value (≤ 1 day old).
 function failedNote(m) {
-  const failed = (m.failed || []).filter((x) => !String(x.kind).startsWith("li_") || !/No campaign in scope/.test(x.error || ""));
-  if (!failed.length) return "";
-  return `<p class="small soft" style="margin-top:10px">${failed.length} number${failed.length === 1 ? "" : "s"} couldn't be loaded on the last refresh, so some figures may be low. Refresh to try again.</p>`;
+  const list = (m.failed || []).filter((x) => !/No campaign in scope/.test(x.error || ""));
+  const stale = list.filter((x) => x.stale).length;
+  const failed = list.length - stale;
+  const parts = [];
+  if (stale) parts.push(`${stale} number${stale === 1 ? "" : "s"} couldn't be refreshed this time, so the last good value${stale === 1 ? " is" : "s are"} shown (up to a day old).`);
+  if (failed) parts.push(`${failed} number${failed === 1 ? "" : "s"} couldn't be loaded, so some figures may be low.`);
+  return parts.length ? `<p class="small soft" style="margin-top:10px">${parts.join(" ")} Refresh to try again.</p>` : "";
 }
 
 function waitingCard(d) {
