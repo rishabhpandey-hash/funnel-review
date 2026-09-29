@@ -7,91 +7,111 @@
 <meta name="color-scheme" content="light">
 <title>Funnel review</title>
 <!--
-  Funnel review — every outbound funnel on one page, in the order the Monday GTM
-  meeting reads them. This page holds no data: after email sign-in it asks the
-  funnel-review edge function (Supabase ops project) for everything.
-  Source of the numbers and the verdict rules: control-tower
+  Funnel review — how every outbound campaign is doing, on one page, in words
+  anyone can read without a walkthrough. This page holds no data: after email
+  sign-in it asks the funnel-review edge function (Supabase ops project).
+  Numbers, verdicts and the wording of each reason: control-tower
   backend/ops/supabase/migrations/20260929_*_funnel_review_*.sql
 -->
 <style>
 :root{
-  --bg:#f6f7f9;--card:#fff;--ink:#101828;--muted:#475467;--soft:#667085;--line:#e4e7ec;
+  --bg:#f5f6f8;--card:#fff;--ink:#101828;--muted:#475467;--soft:#667085;--line:#e4e7ec;
   --accent:#3538cd;--accent-bg:#eef4ff;
-  --red:#b42318;--red-bg:#fef3f2;--red-bar:#f04438;
-  --amber:#b54708;--amber-bg:#fffaeb;--amber-bar:#f79009;
-  --green:#067647;--green-bg:#ecfdf3;--green-bar:#17b26a;
-  --grey:#475467;--grey-bg:#f2f4f7;--grey-bar:#98a2b3;
-  --bar:#c7d7fe;
-  /* Always light, whatever the viewer's system setting (Rishabh, 2026-09-29).
-     color-scheme keeps inputs, scrollbars and the date/select widgets light too. */
+  --red:#b42318;--red-bg:#fef3f2;--red-dot:#f04438;
+  --amber:#b54708;--amber-bg:#fffaeb;--amber-dot:#f79009;
+  --green:#067647;--green-bg:#ecfdf3;--green-dot:#17b26a;
+  --grey:#475467;--grey-bg:#f2f4f7;--grey-dot:#98a2b3;
+  /* Always light, whatever the viewer's system setting (Rishabh, 2026-09-29). */
   color-scheme:light;
 }
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
-.wrap{max-width:980px;margin:0 auto;padding:20px 16px 60px}
-h1{font-size:22px;margin:0;font-weight:650}
-h2{font-size:17px;margin:0 0 4px;font-weight:650}
-h3{font-size:14px;margin:18px 0 8px;font-weight:650;color:var(--muted)}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+.wrap{max-width:920px;margin:0 auto;padding:22px 16px 60px}
+h1{font-size:24px;margin:0;font-weight:700}
+h2{font-size:19px;margin:0;font-weight:700}
+h3{font-size:16px;margin:0;font-weight:650}
 p{margin:0}
+a{color:var(--accent)}
 button,input,select{font:inherit}
 button{cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:7px 12px}
 button:hover{border-color:var(--soft)}
 button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
-button.small{padding:3px 9px;font-size:13px}
-input,select{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:8px 10px;min-width:0}
-.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin-top:14px}
-.muted{color:var(--muted)}.soft{color:var(--soft)}.small{font-size:13px}
-.top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
-.top .right{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;color:var(--soft)}
-.nav{display:flex;gap:14px;font-size:13px;margin-top:6px;flex-wrap:wrap}
-.nav a{color:var(--accent);text-decoration:none}
-.banner{border-radius:10px;padding:10px 14px;margin-top:14px;font-size:14px}
+button.small{padding:4px 10px;font-size:14px}
+input,select{border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:8px;padding:9px 11px;min-width:0}
+.muted{color:var(--muted)}.soft{color:var(--soft)}.small{font-size:14px}
+.section{margin-top:30px}
+.section > h2{margin-bottom:4px}
+.section > .sub{color:var(--muted);font-size:15px;margin-bottom:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px}
+.top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.top .right{display:flex;gap:8px;align-items:center}
+.when{color:var(--muted);margin-top:4px}
+.banner{border-radius:12px;padding:12px 16px;margin-top:16px;font-size:15px}
 .banner.info{background:var(--accent-bg);color:var(--accent)}
 .banner.err{background:var(--red-bg);color:var(--red)}
-.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:14px}
-.tile{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
-.tile b{display:block;font-size:26px;font-weight:650;line-height:1.2}
-.tile span{font-size:13px;color:var(--muted)}
-.summary{margin-top:12px;font-size:15px}
-.fhead{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
-.num{display:inline-flex;width:24px;height:24px;border-radius:50%;background:var(--grey-bg);color:var(--grey);align-items:center;justify-content:center;font-size:13px;font-weight:650;margin-right:8px;flex:none}
-.pill{font-size:13px;font-weight:650;padding:4px 11px;border-radius:999px;white-space:nowrap}
+.banner.alert{background:var(--red-bg);color:var(--red);font-weight:600}
+.banner.alert a{color:var(--red)}
+/* big numbers */
+.tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:18px}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+.tile b{display:block;font-size:30px;font-weight:700;line-height:1.15}
+.tile span{font-size:14px;color:var(--muted)}
+@media (max-width:700px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
+/* overview */
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:14px;color:var(--muted);margin-bottom:10px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.dot{width:12px;height:12px;border-radius:50%;display:inline-block;flex:none}
+.d-red{background:var(--red-dot)}.d-amber{background:var(--amber-dot)}.d-green{background:var(--green-dot)}.d-grey{background:var(--grey-dot)}
+.rows{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.row{display:grid;grid-template-columns:16px minmax(0,1fr) auto;gap:14px;padding:16px 18px;border-top:1px solid var(--line);align-items:start}
+.row:first-child{border-top:none}
+.row .dot{margin-top:7px;width:14px;height:14px}
+.row .name{font-weight:650;font-size:17px}
+.row .name a{color:var(--ink);text-decoration:none}
+.row .name a:hover{text-decoration:underline}
+.row .why{margin-top:3px}
+.row .todo{margin-top:6px;font-size:15px}
+.row .todo b{font-weight:650}
+.chan{font-size:13px;color:var(--soft);font-weight:400;margin-left:6px}
+.pill{font-size:14px;font-weight:650;padding:4px 12px;border-radius:999px;white-space:nowrap}
 .v-red{background:var(--red-bg);color:var(--red)}.v-amber{background:var(--amber-bg);color:var(--amber)}
 .v-green{background:var(--green-bg);color:var(--green)}.v-grey{background:var(--grey-bg);color:var(--grey)}
-.card.red{border-left:5px solid var(--red-bar)}.card.amber{border-left:5px solid var(--amber-bar)}
-.card.green{border-left:5px solid var(--green-bar)}.card.grey{border-left:5px solid var(--grey-bar)}
-.verdict{margin-top:12px;display:grid;gap:6px}
-.verdict .row{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
-.verdict .lab{font-size:12px;font-weight:650;text-transform:uppercase;letter-spacing:.04em;color:var(--soft);width:62px;flex:none}
-.verdict .txt{flex:1;min-width:220px}
-.funnel{display:grid;gap:5px;margin-top:6px}
-.step{display:grid;grid-template-columns:minmax(0,1fr) 70px;align-items:center;gap:10px}
-.bar{background:var(--bar);border-radius:6px;padding:5px 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:190px}
-.bar b{font-weight:650;margin-right:6px}
-.step .conv{font-size:12px;color:var(--soft);text-align:right}
-.gates{display:grid;gap:6px}
-.gate{display:flex;gap:9px;align-items:baseline}
-.dot{width:10px;height:10px;border-radius:50%;flex:none;transform:translateY(1px)}
-.d-red{background:var(--red-bar)}.d-amber{background:var(--amber-bar)}.d-green{background:var(--green-bar)}.d-none{background:var(--grey-bar)}
-.insight{background:var(--accent-bg);color:var(--accent);border-radius:10px;padding:9px 12px;font-size:14px;margin-top:12px}
-table{width:100%;border-collapse:collapse;font-size:14px}
-td,th{padding:7px 6px;border-top:1px solid var(--line);text-align:left;vertical-align:top}
-th{font-size:12px;color:var(--soft);font-weight:600;border-top:none}
+@media (max-width:560px){.row{grid-template-columns:14px minmax(0,1fr)}.row .pill{grid-column:2;justify-self:start}}
+/* detail cards */
+.detail{margin-top:14px}
+.detail .head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:16px}
+.step{background:var(--grey-bg);border-radius:12px;padding:12px 14px;position:relative}
+.step b{display:block;font-size:26px;font-weight:700;line-height:1.15}
+.step span{font-size:14px;color:var(--muted)}
+.step:not(:last-child)::after{content:"→";position:absolute;right:-12px;top:50%;transform:translateY(-50%);color:var(--soft);font-size:16px}
+@media (max-width:600px){.steps{grid-template-columns:repeat(2,minmax(0,1fr))}.step::after{display:none}}
+.extra{font-size:15px;color:var(--muted);margin-top:10px}
+.checks{margin-top:14px;display:grid;gap:8px}
+.check{display:flex;gap:10px;align-items:baseline}
+.mark{width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex:none;transform:translateY(4px)}
+.m-green{background:var(--green-bg);color:var(--green)}.m-amber{background:var(--amber-bg);color:var(--amber)}.m-red{background:var(--red-bg);color:var(--red)}
+.note{background:var(--accent-bg);color:var(--accent);border-radius:10px;padding:10px 14px;margin-top:12px;font-size:15px}
+details{margin-top:14px}
+details summary{cursor:pointer;color:var(--accent);font-size:15px}
+table{width:100%;border-collapse:collapse;font-size:15px;margin-top:8px}
+td,th{padding:8px 6px;border-top:1px solid var(--line);text-align:left;vertical-align:top}
+th{font-size:13px;color:var(--soft);font-weight:600;border-top:none}
 .tablewrap{overflow-x:auto}
-.act{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-top:1px solid var(--line)}
+/* to-do */
+.act{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--line)}
 .act:first-child{border-top:none}
 .act .t{flex:1}
-.tag{font-size:12px;background:var(--grey-bg);color:var(--grey);border-radius:6px;padding:1px 7px;margin-left:6px;white-space:nowrap}
-.addrow{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,1.2fr) minmax(0,1.5fr) auto;gap:8px;margin-top:12px}
-@media (max-width:640px){.addrow{grid-template-columns:1fr}.verdict .lab{width:auto}.bar{min-width:0}}
+.tag{font-size:13px;background:var(--grey-bg);color:var(--grey);border-radius:6px;padding:1px 8px;margin-left:6px;white-space:nowrap}
+.addrow{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,1.2fr) minmax(0,1.5fr) auto;gap:8px;margin-top:14px}
+@media (max-width:640px){.addrow{grid-template-columns:1fr}}
 .center{max-width:420px;margin:12vh auto;text-align:center}
-.center .card{text-align:left}
-.center input{width:100%;margin-top:10px}
+.center .card{text-align:left;margin-top:16px}
+.center input{width:100%;margin-top:8px}
 .center button{width:100%;margin-top:10px}
-.msg{margin-top:10px;font-size:14px}.msg.err{color:var(--red)}
-.foot{font-size:13px;color:var(--soft);margin-top:26px}
-.foot li{margin:3px 0}
-details summary{cursor:pointer;color:var(--accent);font-size:14px;margin-top:12px}
+.msg{margin-top:10px;font-size:15px}.msg.err{color:var(--red)}
+.foot{font-size:14px;color:var(--soft)}
+.foot li{margin:4px 0}
 </style>
 </head>
 <body>
@@ -111,19 +131,31 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 const $root = document.getElementById("root");
 let DATA = null, SESSION = null, POLL = null, BUSY = false, PREVIEW = false;
 
-// ---------- formatting ----------
+// ---------- plain-language formatting ----------
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const n = (v) => (v == null || v === "" || isNaN(Number(v)) ? null : Number(v));
 const fmt = (v) => (n(v) == null ? "–" : Math.round(n(v)).toLocaleString("en-IN"));
-function pct(v) {
-  v = n(v); if (v == null) return "–";
-  const d = Math.abs(v) < 1 ? 2 : 1;
-  return v.toFixed(d).replace(/\.?0+$/, "") + "%";
+const plural = (v, one, many) => (n(v) === 1 ? one : many);
+
+// 0.05 (%) -> "1 in 2,000". Matches fr_one_in() in the database.
+function oneIn(p) {
+  p = n(p);
+  if (p == null) return "–";
+  if (p <= 0) return "none";
+  if (p >= 67) return "most";
+  const x = 100 / p;
+  const r = x < 20 ? Math.round(x) : x < 100 ? Math.round(x / 5) * 5 : x < 1000 ? Math.round(x / 10) * 10 : Math.round(x / 100) * 100;
+  return "1 in " + fmt(r);
 }
-function hrs(v) {
-  v = n(v); if (v == null) return "–";
-  const h = Math.round(v);
-  return h >= 48 ? `${h} h (about ${Math.round(h / 24)} days)` : `${h} h`;
+// 125 (hours) -> "5 days". Matches fr_dur().
+function dur(h) {
+  h = n(h);
+  if (h == null) return "–";
+  if (h < 1) return "under an hour";
+  if (Math.round(h) === 1) return "an hour";
+  if (h < 36) return `${Math.round(h)} hours`;
+  const d = Math.round(h / 24);
+  return `${d} ${d === 1 ? "day" : "days"}`;
 }
 function ago(ts) {
   if (!ts) return "never";
@@ -131,19 +163,25 @@ function ago(ts) {
   if (m < 1) return "just now";
   if (m < 60) return `${m} min ago`;
   const h = Math.round(m / 60);
-  return h < 24 ? `${h} h ago` : `${Math.round(h / 24)} days ago`;
+  return h < 24 ? `${h} ${h === 1 ? "hour" : "hours"} ago` : `${Math.round(h / 24)} days ago`;
 }
-function day(d) {
-  if (!d) return "";
-  return new Date(d + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+const day = (d) => (d ? new Date(d + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "");
+
+// "B2B — Generic (no personalization data) — Edbound Sales — Jul 2026" -> "B2B · Generic (no personalization data)"
+function shortName(name) {
+  const parts = String(name || "").split(/\s+[—|]\s+/).map((p) => p.trim()).filter(Boolean);
+  const keep = parts.filter((p) => !/^(TEST|Edbound( Sales)?|[A-Z][a-z]{2,8} 20\d\d|20\d\d)$/i.test(p));
+  return (keep.length ? keep : parts).join(" · ");
 }
-const VERDICT = { red: "Not working", amber: "Watch", green: "Working" };
-function verdictLabel(f) {
-  if (f.verdict !== "grey") return VERDICT[f.verdict] || "No data";
+
+const STATUS = { red: "Not working", amber: "Needs attention", green: "Working" };
+function statusLabel(f) {
+  if (f.verdict && f.verdict !== "grey") return STATUS[f.verdict];
   if (f.status === "launching") return "Not started";
-  if (f.metrics && f.metrics.kind === "linkedin" && f.metrics.connected === 0) return "Not connected";
-  if (f.metrics && f.metrics.error) return "Could not load";
-  return "Too early";
+  const m = f.metrics || {};
+  if (m.kind === "linkedin" && m.connected === 0) return "Not connected";
+  if (m.error) return "Couldn't load";
+  return f.verdict ? "Too early" : "No numbers yet";
 }
 
 // ---------- API ----------
@@ -153,7 +191,6 @@ async function api(path, body) {
   let res;
   try { res = await fetch(API + path, opts); }
   catch { throw new Error("Couldn't reach the dashboard server. Check your connection and try again."); }
-  if (res.status === 404 && path === "/api/review") throw new Error("The dashboard server isn't live yet.");
   const out = await res.json().catch(() => ({}));
   if (res.status === 401) { await signOut("Your session expired. Sign in again."); throw new Error("signed out"); }
   if (res.status === 403) { renderDenied(out.email); throw new Error("denied"); }
@@ -175,8 +212,8 @@ async function load(quiet) {
 
 function schedulePoll() {
   clearTimeout(POLL);
-  // Poll quickly while a refresh is running; otherwise refresh the view every 5 min
-  // (the data itself is rebuilt hourly in the background).
+  // Poll quickly while a refresh runs; otherwise re-read every 5 minutes (the
+  // numbers themselves are rebuilt hourly in the background).
   const wait = DATA && DATA.refreshing ? 15000 : 300000;
   POLL = setTimeout(() => { if (!document.hidden) load(true); else schedulePoll(); }, wait);
 }
@@ -200,7 +237,7 @@ async function action(body) {
 function renderSignIn(message, isError) {
   $root.innerHTML = `
     <div class="center">
-      <h1>Funnel review</h1>
+      <h1>How our outreach is doing</h1>
       <p class="muted" style="margin-top:6px">Sign in with your work email.</p>
       <div class="card">
         <label class="small muted" for="em">Email</label>
@@ -216,6 +253,7 @@ function renderSignIn(message, isError) {
     </div>`;
   const em = document.getElementById("em"), msg = document.getElementById("msg");
   const setMsg = (t, err) => { msg.textContent = t; msg.className = "msg" + (err ? " err" : ""); };
+  em.oninput = () => setMsg("");
   document.getElementById("send").onclick = async () => {
     const email = em.value.trim().toLowerCase();
     if (!email.includes("@")) return setMsg("Enter a valid email.", true);
@@ -237,15 +275,15 @@ function renderSignIn(message, isError) {
 
 function renderDenied(email) {
   $root.innerHTML = `
-    <div class="center"><h1>Funnel review</h1>
-      <div class="card"><p><b>${esc(email || "This email")}</b> doesn't have access to this dashboard.</p>
+    <div class="center"><h1>How our outreach is doing</h1>
+      <div class="card"><p><b>${esc(email || "This email")}</b> doesn't have access to this page.</p>
       <p class="muted small" style="margin-top:8px">Ask Rishabh to add you.</p>
       <button id="out" style="margin-top:14px">Sign in with a different email</button></div></div>`;
   document.getElementById("out").onclick = () => signOut("");
 }
 
 function renderError(text) {
-  $root.innerHTML = `<div class="center"><h1>Funnel review</h1>
+  $root.innerHTML = `<div class="center"><h1>How our outreach is doing</h1>
     <div class="banner err">${esc(text)}</div>
     <button id="retry" style="margin-top:12px">Try again</button></div>`;
   document.getElementById("retry").onclick = () => load();
@@ -259,269 +297,259 @@ async function signOut(note) {
 }
 
 // ---------- page ----------
-function summary(d) {
-  let emails = 0, liMsgs = 0, liInv = 0, interested = 0, demos = 0, meetings = 0, waitingEmail = 0, waitingLi = 0, humanEmail = 0, liReplied = 0;
+function totals(d) {
+  const t = { emails: 0, liMsgs: 0, interested: 0, demos: 0, emailWaiting: [], liWaiting: 0, liWaitingList: [] };
   for (const f of d.funnels) {
     const m = f.metrics || {};
     if (m.kind === "email") {
-      emails += n(m.week?.sent) || 0; interested += n(m.week?.positive) || 0; meetings += n(m.week?.meetings) || 0;
-      humanEmail += n(m.week?.human) || 0; waitingEmail += (m.waiting || []).length;
+      t.emails += n(m.week?.sent) || 0;
+      t.interested += n(m.week?.positive) || 0;
+      t.demos += n(m.week?.meetings) || 0;
+      for (const x of m.waiting || []) t.emailWaiting.push({ ...x, funnel: f.name });
     } else if (m.kind === "linkedin") {
-      liMsgs += n(m.week?.messages) || 0; liInv += n(m.week?.invites) || 0; demos += n(m.week?.demos) || 0;
-      liReplied += n(m.week?.people_replied) || 0; waitingLi += n(m.now?.waiting_48h) || 0;
+      t.liMsgs += n(m.week?.messages) || 0;
+      t.demos += n(m.week?.demos) || 0;
+      t.liWaiting += n(m.now?.waiting_48h) || 0;
+      for (const x of m.waiting || []) t.liWaitingList.push({ ...x, funnel: f.name });
     }
   }
-  return { emails, liMsgs, liInv, interested, demos: demos + meetings, waitingEmail, waitingLi, humanEmail, liReplied };
+  t.emailWaiting.sort((a, b) => (n(b.waiting_h) || 0) - (n(a.waiting_h) || 0));
+  t.liWaitingList.sort((a, b) => (n(a.waiting_h) || 0) - (n(b.waiting_h) || 0));
+  return t;
 }
 
 function renderApp() {
-  const d = DATA;
-  const s = summary(d);
+  const d = DATA, t = totals(d), w = d.window || {};
   const target = n(d.demos_target) || 5;
-  const w = d.window || {};
-  const refreshing = d.refreshing
-    ? `<div class="banner info">Refreshing: ${fmt(d.refreshing.total - d.refreshing.left)} of ${fmt(d.refreshing.total)} numbers are in. This page updates by itself when it's done (about 10 minutes).</div>`
-    : "";
-  const never = !d.built_at
-    ? `<div class="banner info">The first numbers are still being collected. Give it about 10 minutes.</div>` : "";
+  const oldest = t.emailWaiting[0];
 
   $root.innerHTML = `
     <div class="top">
-      <div><h1>Outbound funnels</h1>
-        <div class="nav"><a href="#funnels">Funnels</a><a href="#waiting">Waiting for us</a><a href="#actions">Actions</a><a href="#how">How the numbers work</a></div>
+      <div>
+        <h1>How our outreach is doing</h1>
+        <p class="when">${d.built_at ? `Last 7 days (${esc(day(w.start))} to ${esc(day(w.end))}) · updated ${esc(ago(d.built_at))}` : "Collecting the first numbers…"}</p>
       </div>
       <div class="right">
-        <span title="${esc(d.built_at || "")}">Updated ${esc(ago(d.built_at))}</span>
-        <button class="small" id="refresh" ${d.refreshing ? "disabled" : ""}>${d.refreshing ? "Refreshing…" : "Refresh now"}</button>
-        <span>${esc(d.me?.email || "")}</span>
-        <button class="small" id="signout">Sign out</button>
+        <button class="small" id="refresh" ${d.refreshing ? "disabled" : ""}>${d.refreshing ? "Updating…" : "Update now"}</button>
+        <button class="small" id="signout" title="${esc(d.me?.email || "")}">Sign out</button>
       </div>
     </div>
-    ${refreshing}${never}
+    ${d.refreshing ? `<div class="banner info">Updating the numbers (${fmt(d.refreshing.total - d.refreshing.left)} of ${fmt(d.refreshing.total)} done). The page changes by itself when it's finished, in about 10 minutes.</div>` : ""}
     ${d.built_at ? `
     <div class="tiles">
-      <div class="tile"><b>${fmt(s.emails)}</b><span>emails sent in the last 7 days</span></div>
-      <div class="tile"><b>${fmt(s.liInv)} / ${fmt(s.liMsgs)}</b><span>LinkedIn invitations / messages sent</span></div>
-      <div class="tile"><b>${fmt(s.interested)}</b><span>interested email replies</span></div>
-      <div class="tile"><b>${fmt(s.demos)} <small class="soft" style="font-size:15px">of ${fmt(target)}</small></b><span>demos booked (target ${fmt(target)} a week)</span></div>
+      <div class="tile"><b>${fmt(t.emails)}</b><span>emails sent</span></div>
+      <div class="tile"><b>${fmt(t.liMsgs)}</b><span>LinkedIn messages sent</span></div>
+      <div class="tile"><b>${fmt(t.interested)}</b><span>${plural(t.interested, "person", "people")} interested</span></div>
+      <div class="tile"><b>${fmt(t.demos)} <span style="font-size:17px">of ${fmt(target)}</span></b><span>demos booked (goal ${fmt(target)} a week)</span></div>
     </div>
-    <p class="summary">From <b>${esc(day(w.start))}</b> to <b>${esc(day(w.end))}</b> we sent ${fmt(s.emails)} cold emails and ${fmt(s.liMsgs)} LinkedIn messages.
-      ${fmt(s.humanEmail)} people wrote back to an email for real, ${fmt(s.interested)} of them interested, and ${fmt(s.liReplied)} replied on LinkedIn.
-      ${s.waitingEmail + s.waitingLi > 0 ? `<b>${fmt(s.waitingEmail + s.waitingLi)} people are waiting for us to reply.</b>` : "Nobody is waiting for a reply."}</p>` : ""}
+    ${t.emailWaiting.length ? `<div class="banner alert">${fmt(t.emailWaiting.length)} ${plural(t.emailWaiting.length, "person replied by email and is", "people replied by email and are")} waiting for our answer. The longest wait is ${esc(dur(oldest.waiting_h))}. <a href="#waiting">See who</a></div>` : ""}
 
-    <div id="funnels">${d.funnels.map(funnelCard).join("")}</div>
-    ${waitingCard(d)}
-    ${actionsCard(d)}
-    ${howCard()}`;
+    <div class="section">
+      <h2>Each campaign at a glance</h2>
+      <p class="sub">What's wrong, and the one thing to do about it.</p>
+      <div class="legend">
+        <span><i class="dot d-green"></i>Working</span><span><i class="dot d-amber"></i>Needs attention</span>
+        <span><i class="dot d-red"></i>Not working</span><span><i class="dot d-grey"></i>Not started or no numbers</span>
+      </div>
+      <div class="rows">${d.funnels.map(overviewRow).join("")}</div>
+    </div>
+
+    <div class="section">
+      <h2>The numbers behind each campaign</h2>
+      <p class="sub">Last 7 days, and how it compares with a good campaign.</p>
+      ${d.funnels.map(detailCard).join("")}
+    </div>
+
+    ${waitingSection(t)}
+    ${todoSection(d)}
+    ${howSection()}` : ""}`;
 
   document.getElementById("refresh").onclick = refreshNow;
   document.getElementById("signout").onclick = () => signOut("Signed out.");
   bindActions();
 }
 
-function funnelCard(f) {
-  const m = f.metrics || {};
-  const cls = f.verdict || "grey";
-  const head = `
-    <div class="fhead">
-      <div style="display:flex;align-items:flex-start"><span class="num">${esc(f.position)}</span>
-        <div><h2>${esc(f.name)} <span class="tag">${f.channel === "email" ? "Email" : "LinkedIn"}</span></h2>
-        ${f.note && f.note !== f.reason ? `<p class="small muted">${esc(f.note)}</p>` : ""}</div></div>
-      <span class="pill v-${esc(cls)}">${esc(verdictLabel(f))}</span>
+function overviewRow(f) {
+  const v = f.verdict || "grey";
+  return `<div class="row">
+    <i class="dot d-${esc(v)}"></i>
+    <div>
+      <div class="name"><a href="#f-${esc(f.id)}">${esc(f.name)}</a><span class="chan">${f.channel === "email" ? "Email" : "LinkedIn"}</span></div>
+      <p class="why">${esc(f.reason || "No numbers yet.")}</p>
+      ${f.action ? `<p class="todo"><b>What to do:</b> ${esc(f.action)}
+        <button class="small" data-add="${esc(f.id)}" data-text="${esc(f.action)}" style="margin-left:6px">Add to to-do list</button></p>` : ""}
     </div>
-    <div class="verdict">
-      <div class="row"><span class="lab">Why</span><span class="txt">${esc(f.reason || "No numbers yet.")}</span></div>
-      ${f.action ? `<div class="row"><span class="lab">Do this</span><span class="txt"><b>${esc(f.action)}</b>
-        <button class="small" data-add="${esc(f.id)}" data-text="${esc(f.action)}" style="margin-left:6px">+ Add to actions</button></span></div>` : ""}
-    </div>`;
-  if (!f.verdict) return `<div class="card grey">${head}</div>`;
-  if (m.kind === "email") return `<div class="card ${esc(cls)}">${head}${emailBody(f, m)}</div>`;
-  if (m.kind === "linkedin") return `<div class="card ${esc(cls)}">${head}${linkedinBody(f, m)}</div>`;
-  return `<div class="card ${esc(cls)}">${head}</div>`;
+    <span class="pill v-${esc(v)}">${esc(statusLabel(f))}</span>
+  </div>`;
 }
 
-// Each step: { v, one, many }; the label follows the count ("1 person replied").
-// noConv marks a step that isn't a subset of the one above, so a % would mislead.
-function funnelSteps(steps) {
-  const widths = [100, 86, 72, 58, 46, 36];
-  return `<div class="funnel">${steps.map((st, i) => {
-    const prev = i > 0 ? n(steps[i - 1].v) : null;
-    const conv = i > 0 && prev && !st.noConv ? pct((100 * (n(st.v) || 0)) / prev) : "";
-    const label = n(st.v) === 1 ? st.one : st.many;
-    return `<div class="step"><div class="bar" style="width:${widths[i] || 30}%"><b>${fmt(st.v)}</b>${esc(label)}</div>
-      <span class="conv">${conv ? esc(conv) : ""}</span></div>`;
+function steps(list) {
+  return `<div class="steps">${list.map((s) => `<div class="step"><b>${fmt(s.v)}</b><span>${esc(n(s.v) === 1 ? s.one : s.many)}</span></div>`).join("")}</div>`;
+}
+
+// One line per benchmark check, in words. Checks with no data yet are left out.
+function checks(gates) {
+  const rows = (gates || []).filter((g) => g && g.value != null && g.colour);
+  if (!rows.length) return "";
+  const mark = { green: "✓", amber: "!", red: "✕" };
+  return `<div class="checks">${rows.map((g) => {
+    let now, good;
+    if (g.metric === "reply_speed_h") { now = `about ${dur(g.value)}`; good = "the same day"; }
+    else if (g.metric === "waiting_48h") { now = fmt(g.value); good = "none"; }
+    else if (g.higher_is_better) { now = oneIn(g.value); good = oneIn(g.good); }
+    // Lower is better here, so "fewer than": 1 in 75 beats a target of 1 in 50.
+    else { now = oneIn(g.value); good = `fewer than ${oneIn(g.good)}`; }
+    return `<div class="check"><span class="mark m-${esc(g.colour)}">${mark[g.colour]}</span>
+      <span><b>${esc(g.label)}:</b> ${esc(now)}. <span class="soft">Good is ${esc(good)}.</span></span></div>`;
   }).join("")}</div>`;
 }
 
-function gateList(gates) {
-  return `<div class="gates">${(gates || []).filter(Boolean).map((g) => {
-    const unit = g.metric.endsWith("_pct") ? "%" : g.metric === "reply_speed_h" ? " h" : "";
-    const val = g.value == null ? "not enough data yet"
-      : g.metric.endsWith("_pct") ? pct(g.value) : g.metric === "reply_speed_h" ? hrs(g.value) : fmt(g.value);
-    const good = g.higher_is_better ? `${fmtNum(g.good)}${unit} or more` : (Number(g.good) === 0 ? "none" : `${fmtNum(g.good)}${unit} or less`);
-    return `<div class="gate"><span class="dot d-${esc(g.colour || "none")}"></span>
-      <span><b>${esc(g.label)}:</b> ${esc(val)}. <span class="soft">Good is ${esc(good)} · ${esc(g.basis)}</span></span></div>`;
-  }).join("")}</div>`;
-}
-const fmtNum = (v) => String(Number(v));
-
-function trend(now, before, word) {
-  now = n(now) || 0; before = n(before) || 0;
-  if (now === before) return `same ${word} as the 7 days before (${fmt(before)})`;
-  return `${now > before ? "up" : "down"} from ${fmt(before)} the 7 days before`;
+function detailCard(f) {
+  const m = f.metrics || {}, v = f.verdict || "grey";
+  const head = `<div class="head"><h3>${esc(f.name)} <span class="chan">${f.channel === "email" ? "Email" : "LinkedIn"}</span></h3>
+    <span class="pill v-${esc(v)}">${esc(statusLabel(f))}</span></div>`;
+  let body = "";
+  if (f.status === "launching") body = `<p class="extra">${esc(f.reason || f.note || "")}</p>`;
+  else if (m.kind === "email") body = emailBody(m);
+  else if (m.kind === "linkedin") body = linkedinBody(m);
+  else body = `<p class="extra">${esc(f.reason || "No numbers yet.")}</p>`;
+  return `<div class="card detail" id="f-${esc(f.id)}">${head}${body}</div>`;
 }
 
-function emailBody(f, m) {
-  const wk = m.week || {}, pv = m.prev || {}, life = m.life || {}, sp = m.speed || {};
-  const steps = [
-    { v: wk.sent, one: "email sent", many: "emails sent" },
-    { v: wk.replies, one: "reply of any kind", many: "replies of any kind" },
-    { v: wk.human, one: "real reply (not an auto-reply or 'wrong person')", many: "real replies (not auto-replies or 'wrong person')" },
-    { v: wk.positive, one: "interested", many: "interested" },
-    { v: wk.meetings, one: "asked for a meeting", many: "asked for a meeting" },
-  ];
-  const insights = [];
-  if (n(life.left_org) >= 10) insights.push(`Of ${fmt(life.wrong_person)} "wrong person" replies, ${fmt(life.left_org)} say the contact has left and ${fmt(life.names_other)} give another email address, often whoever took over. That's a free list of the right people.`);
-  if (n(sp.unanswered) > 0) insights.push(`${fmt(sp.unanswered)} interested ${n(sp.unanswered) === 1 ? "person has" : "people have"} never had a reply from us.`);
-  if (n(life.not_started) > 0) insights.push(`${fmt(life.not_started)} leads in these campaigns haven't been emailed yet.`);
+function emailBody(m) {
+  const wk = m.week || {}, life = m.life || {}, sp = m.speed || {};
+  const notes = [];
+  if (n(sp.unanswered) > 0) notes.push(`${fmt(sp.unanswered)} interested ${plural(sp.unanswered, "person has", "people have")} never had a reply from us.`);
+  if (n(life.left_org) >= 10) notes.push(`${fmt(life.left_org)} people wrote back to say the person we emailed has left. ${fmt(life.names_other)} of these replies give another email address to try.`);
+  if (n(life.not_started) > 0) notes.push(`${fmt(life.not_started)} people in these campaigns haven't been emailed yet.`);
   return `
-    <h3>Last 7 days</h3>
-    ${funnelSteps(steps)}
-    <p class="small soft" style="margin-top:6px">Real replies: ${esc(trend(wk.human, pv.human, "number"))}. Interested: ${esc(trend(wk.positive, pv.positive, "number"))}.
-      ${n(wk.bounces) ? `Bounced: ${fmt(wk.bounces)}, of which ${fmt(wk.our_bounces)} failed in our own mailboxes.` : ""}</p>
-    <h3>Against the benchmarks (since launch: ${fmt(life.contacted)} people emailed)</h3>
-    ${gateList(m.gates)}
-    ${insights.map((t) => `<div class="insight">${esc(t)}</div>`).join("")}
-    <details><summary>Campaigns in this funnel (${(m.campaigns || []).length})</summary>
+    ${steps([
+      { v: wk.sent, one: "email sent", many: "emails sent" },
+      { v: wk.human, one: "person replied", many: "people replied" },
+      { v: wk.positive, one: "interested", many: "interested" },
+      { v: wk.meetings, one: "asked for a meeting", many: "asked for a meeting" },
+    ])}
+    <p class="extra">Out-of-office and "wrong person" replies aren't counted. Since the start, these campaigns have emailed ${fmt(life.contacted)} people.</p>
+    ${checks(m.gates)}
+    ${notes.map((x) => `<div class="note">${esc(x)}</div>`).join("")}
+    <details><summary>More detail</summary>
       <div class="tablewrap"><table>
-        <tr><th>Campaign</th><th>Emailed since launch</th><th>Last 7 days</th><th>Interested since launch</th></tr>
+        <tr><th>Campaign</th><th>Emailed since the start</th><th>Last 7 days</th><th>Interested since the start</th></tr>
         ${(m.campaigns || []).map((c) => `<tr>
-          <td>${esc(c.name)}<div class="small soft">${esc((c.status || "").toLowerCase())}${c.loaded === false ? " · some numbers didn't load" : ""}</div></td>
+          <td>${esc(shortName(c.name))}<div class="small soft">${esc((c.status || "").toLowerCase())}</div></td>
           <td>${fmt(c.contacted)}${n(c.not_started) ? `<div class="small soft">${fmt(c.not_started)} not emailed yet</div>` : ""}</td>
-          <td>${fmt(c.sent_7d)} sent · ${fmt(c.human_7d)} real replies · ${fmt(c.positive_7d)} interested</td>
-          <td>${pct(c.positive_pct)}<div class="small soft">real replies ${pct(c.human_pct)} · bad addresses ${pct(c.hard_bounce_pct)}</div></td></tr>`).join("")}
+          <td>${fmt(c.sent_7d)} sent · ${fmt(c.human_7d)} replied · ${fmt(c.positive_7d)} interested</td>
+          <td>${fmt(c.positive_life)} (${esc(oneIn(c.positive_pct))})</td></tr>`).join("")}
       </table></div>
-    </details>
-    ${failedNote(m)}`;
+      ${failedNote(m)}
+    </details>`;
 }
 
-function linkedinBody(f, m) {
-  if (f.status === "launching") return "";
+function linkedinBody(m) {
   const wk = m.week || {}, now = m.now || {};
   const connected = (m.campaigns || []).filter((c) => c.connected);
   const missing = (m.campaigns || []).filter((c) => !c.connected);
   const missNote = missing.length
-    ? `<div class="insight">Not connected yet: ${missing.map((c) => esc(c.name)).join(", ")}. Map ${missing.length === 1 ? "it" : "them"} in the LinkedIn inbox admin panel to include ${missing.length === 1 ? "it" : "them"} here.</div>` : "";
+    ? `<div class="note">Not connected yet: ${missing.map((c) => esc(shortName(c.name))).join(", ")}. Add ${missing.length === 1 ? "it" : "them"} in the LinkedIn inbox admin panel to see ${missing.length === 1 ? "its" : "their"} numbers here.</div>` : "";
   if (!connected.length) return missNote;
-  const steps = [
-    { v: wk.invites, one: "invitation sent", many: "invitations sent" },
-    { v: wk.accepted, one: "accepted", many: "accepted" },
-    // Messages also go to people who accepted weeks ago, so no % against "accepted".
-    { v: wk.messages, one: "message sent", many: "messages sent", noConv: true },
-    { v: wk.people_replied, one: "person replied", many: "people replied" },
-    { v: wk.demos, one: "demo booked or held", many: "demos booked or held" },
-  ];
   const senders = [];
-  for (const c of connected) for (const s of c.senders || []) senders.push({ ...s, campaign: c.name });
+  for (const c of connected) for (const s of c.senders || []) senders.push(s);
   return `
-    <h3>Last 7 days</h3>
-    ${funnelSteps(steps)}
-    <p class="small soft" style="margin-top:6px">Right now: ${fmt(now.awaiting)} replies are waiting for us, ${fmt(now.waiting_48h)} of them for more than 2 days. ${fmt(now.leads)} leads are in these campaigns.</p>
-    <h3>Against the benchmarks</h3>
-    ${gateList(m.gates)}
+    ${steps([
+      { v: wk.invites, one: "invite sent", many: "invites sent" },
+      { v: wk.accepted, one: "accepted", many: "accepted" },
+      { v: wk.people_replied, one: "person replied", many: "people replied" },
+      { v: wk.demos, one: "demo booked", many: "demos booked" },
+    ])}
+    <p class="extra">We also sent ${fmt(wk.messages)} ${plural(wk.messages, "message", "messages")}. Right now ${fmt(now.waiting_48h)} ${plural(now.waiting_48h, "person has", "people have")} waited over 2 days for our reply.</p>
+    ${checks(m.gates)}
     ${missNote}
-    ${senders.length ? `<details><summary>By sending profile (${senders.length})</summary><div class="tablewrap"><table>
-      <tr><th>Profile</th><th>Waiting for us</th><th>Our average reply time</th><th>Conversations</th></tr>
-      ${senders.sort((a, b) => (n(b.awaiting) || 0) - (n(a.awaiting) || 0)).map((s) => `<tr><td>${esc(s.name)}${connected.length > 1 ? `<div class="small soft">${esc(s.campaign)}</div>` : ""}</td>
-        <td>${fmt(s.awaiting)}</td><td>${esc(s.avg_response || "–")}</td><td>${fmt(s.conversations)}</td></tr>`).join("")}
-    </table></div></details>` : ""}
-    ${failedNote(m)}`;
+    ${senders.length ? `<details><summary>More detail: who sends, and how fast they reply</summary><div class="tablewrap"><table>
+      <tr><th>Sent from</th><th>Waiting for their reply</th><th>Their usual reply time</th></tr>
+      ${senders.sort((a, b) => (n(b.awaiting) || 0) - (n(a.awaiting) || 0)).map((s) => `<tr><td>${esc(s.name)}</td>
+        <td>${fmt(s.awaiting)}</td><td>${esc(s.avg_response ? dur(parseFloat(s.avg_response)) : "–")}</td></tr>`).join("")}
+    </table></div>${failedNote(m)}</details>` : failedNote(m)}`;
 }
 
-// "Not connected" campaigns are explained elsewhere, so they're left out here.
-// A stale entry means the refresh fell back to the last good value (≤ 1 day old).
+// "Not connected" campaigns are explained in the card. A stale entry means the
+// update fell back to the last good value (at most a day old).
 function failedNote(m) {
   const list = (m.failed || []).filter((x) => !/No campaign in scope/.test(x.error || ""));
-  const stale = list.filter((x) => x.stale).length;
-  const failed = list.length - stale;
+  const stale = list.filter((x) => x.stale).length, failed = list.length - stale;
   const parts = [];
-  if (stale) parts.push(`${stale} number${stale === 1 ? "" : "s"} couldn't be refreshed this time, so the last good value${stale === 1 ? " is" : "s are"} shown (up to a day old).`);
-  if (failed) parts.push(`${failed} number${failed === 1 ? "" : "s"} couldn't be loaded, so some figures may be low.`);
-  return parts.length ? `<p class="small soft" style="margin-top:10px">${parts.join(" ")} Refresh to try again.</p>` : "";
+  if (stale) parts.push(`${stale} ${plural(stale, "number", "numbers")} couldn't be updated this time, so the last good ${plural(stale, "value is", "values are")} shown (at most a day old).`);
+  if (failed) parts.push(`${failed} ${plural(failed, "number", "numbers")} couldn't be loaded, so some figures may be low.`);
+  return parts.length ? `<p class="small soft" style="margin-top:10px">${parts.join(" ")}</p>` : "";
 }
 
-function waitingCard(d) {
-  const email = [], li = [];
-  const names = {};
-  let liTotal = 0;
-  for (const f of d.funnels) for (const c of f.metrics?.campaigns || []) if (c.id) names[c.id] = c.name;
-  for (const f of d.funnels) {
-    const m = f.metrics || {};
-    if (m.kind === "email") for (const x of m.waiting || []) email.push({ ...x, funnel: f.name });
-    if (m.kind === "linkedin") {
-      liTotal += n(m.now?.waiting_48h) || 0;
-      for (const x of m.waiting || []) li.push({ ...x, funnel: f.name });
-    }
-  }
-  email.sort((a, b) => (n(b.waiting_h) || 0) - (n(a.waiting_h) || 0));
-  // Most recent first: someone who wrote 3 days ago is still worth answering; a
-  // thread that has waited six months mostly isn't.
-  li.sort((a, b) => (n(a.waiting_h) || 0) - (n(b.waiting_h) || 0));
-  const liOld = li.filter((x) => n(x.waiting_h) > 30 * 24).length;
-  return `<div class="card" id="waiting">
-    <h2>Waiting for us to reply</h2>
-    <p class="small muted">People who wrote back and haven't heard from us. Email: interested or not yet tagged, last 30 days. LinkedIn: waiting more than 2 days.</p>
-    ${email.length ? `<h3>Email (${email.length})</h3><div class="tablewrap"><table>
-      <tr><th>Who</th><th>Campaign</th><th>Tagged as</th><th>Waiting</th></tr>
-      ${email.map((x) => `<tr><td>${esc(x.name)}<div class="small soft">${esc(x.email)}</div></td><td>${esc(names[x.campaign_id] || x.funnel)}</td>
-        <td>${esc(x.category)}</td><td>${esc(hrs(x.waiting_h))}</td></tr>`).join("")}</table></div>` : `<p style="margin-top:10px">No email replies are waiting.</p>`}
-    ${li.length ? `<h3>LinkedIn (${fmt(Math.max(liTotal, li.length))})</h3><div class="tablewrap"><table>
-      <tr><th>Who</th><th>Sent from</th><th>Campaign</th><th>Waiting</th></tr>
-      ${li.slice(0, 25).map((x) => `<tr><td>${esc(x.name)}${x.company ? `<div class="small soft">${esc(x.company)}</div>` : ""}</td><td>${esc(x.sender)}</td>
-        <td>${esc(x.campaign)}</td><td>${esc(hrs(x.waiting_h))}</td></tr>`).join("")}</table></div>
-      <p class="small soft" style="margin-top:6px">Most recent first${li.length > 25 ? `, showing 25 of ${fmt(Math.max(liTotal, li.length))}` : ""}.${liOld ? ` ${fmt(liOld)} of the ones loaded have waited more than 30 days and are probably cold.` : ""} The LinkedIn inbox has the full list.</p>` : `<p style="margin-top:10px">No LinkedIn replies are waiting more than 2 days.</p>`}
+function waitingSection(t) {
+  const li = t.liWaitingList;
+  const recent = li.filter((x) => n(x.waiting_h) <= 30 * 24).length;
+  return `<div class="section" id="waiting">
+    <h2>People waiting for our reply</h2>
+    <p class="sub">They wrote back and haven't heard from us yet.</p>
+    <div class="card">
+      <h3>By email (${fmt(t.emailWaiting.length)})</h3>
+      ${t.emailWaiting.length ? `<div class="tablewrap"><table>
+        <tr><th>Who</th><th>Campaign</th><th>Waiting</th></tr>
+        ${t.emailWaiting.map((x) => `<tr><td>${esc(x.name)}<div class="small soft">${esc(x.email)}</div></td>
+          <td>${esc(x.funnel)}</td><td>${esc(dur(x.waiting_h))}</td></tr>`).join("")}</table></div>`
+        : `<p class="muted" style="margin-top:6px">Nobody. Every email reply has been answered.</p>`}
+      <h3 style="margin-top:20px">On LinkedIn (${fmt(Math.max(t.liWaiting, li.length))})</h3>
+      ${li.length ? `<p class="muted" style="margin-top:6px">${recent === 0
+          ? `All of them have waited more than a month, so most have gone cold. Answer the ones that still matter.`
+          : `${fmt(recent)} of them wrote in the last month. Start with those.`}</p>
+        <details><summary>See the list (most recent first)</summary><div class="tablewrap"><table>
+          <tr><th>Who</th><th>Sent from</th><th>Waiting</th></tr>
+          ${li.slice(0, 30).map((x) => `<tr><td>${esc(x.name)}${x.company ? `<div class="small soft">${esc(x.company)}</div>` : ""}</td>
+            <td>${esc(x.sender)}</td><td>${esc(dur(x.waiting_h))}</td></tr>`).join("")}
+        </table></div><p class="small soft" style="margin-top:6px">The LinkedIn inbox has the full list.</p></details>`
+        : `<p class="muted" style="margin-top:6px">Nobody has waited more than 2 days.</p>`}
+    </div>
   </div>`;
 }
 
-function actionsCard(d) {
+function todoSection(d) {
   const funnels = Object.fromEntries(d.funnels.map((f) => [f.id, f.name]));
   const open = d.actions.filter((a) => a.status === "open");
   const week = Date.now() - 7 * 864e5;
   const done = d.actions.filter((a) => a.status !== "open" && new Date(a.done_at || a.created_at).getTime() >= week);
   const row = (a) => `<div class="act">
       <div class="t">${esc(a.text)}${a.funnel_id ? `<span class="tag">${esc(funnels[a.funnel_id] || a.funnel_id)}</span>` : ""}
-        <div class="small soft">${a.owner ? `Owner: ${esc(a.owner)} · ` : ""}${a.status === "open" ? `added ${esc(ago(a.created_at))}` : `${a.status === "done" ? "done" : "dropped"} ${esc(ago(a.done_at))}`}</div></div>
+        <div class="small soft">${a.owner ? `${esc(a.owner)} · ` : ""}${a.status === "open" ? `added ${esc(ago(a.created_at))}` : `${a.status === "done" ? "done" : "dropped"} ${esc(ago(a.done_at))}`}</div></div>
       ${a.status === "open"
         ? `<button class="small" data-status="done" data-id="${esc(a.id)}">Done</button><button class="small" data-status="dropped" data-id="${esc(a.id)}">Drop</button>`
-        : `<button class="small" data-status="open" data-id="${esc(a.id)}">Reopen</button>`}
+        : `<button class="small" data-status="open" data-id="${esc(a.id)}">Undo</button>`}
     </div>`;
-  return `<div class="card" id="actions">
-    <h2>Actions</h2>
-    <p class="small muted">What we agreed to do. Tick them off as they're done; the meeting starts with what got done in the last 7 days.</p>
-    <h3>Done in the last 7 days (${done.length})</h3>
-    ${done.length ? done.map(row).join("") : `<p class="soft">Nothing marked done yet.</p>`}
-    <h3>Lined up (${open.length})</h3>
-    ${open.length ? open.map(row).join("") : `<p class="soft">No open actions. Add one below, or use "+ Add to actions" on a funnel.</p>`}
-    <div class="addrow">
-      <input id="a-text" placeholder="What needs doing" maxlength="500">
-      <input id="a-owner" placeholder="Owner" list="owners" maxlength="60">
-      <select id="a-funnel"><option value="">No funnel</option>${d.funnels.map((f) => `<option value="${esc(f.id)}">${esc(f.name)}</option>`).join("")}</select>
-      <button class="primary" id="a-add">Add</button>
+  return `<div class="section" id="todo">
+    <h2>To-do list</h2>
+    <p class="sub">What we agreed to do. Tick things off when they're done.</p>
+    <div class="card">
+      <h3>Still to do (${open.length})</h3>
+      ${open.length ? open.map(row).join("") : `<p class="muted" style="margin-top:6px">Nothing yet. Use "Add to to-do list" above, or add one here.</p>`}
+      <h3 style="margin-top:18px">Done in the last 7 days (${done.length})</h3>
+      ${done.length ? done.map(row).join("") : `<p class="muted" style="margin-top:6px">Nothing marked done yet.</p>`}
+      <div class="addrow">
+        <input id="a-text" placeholder="What needs doing" maxlength="500">
+        <input id="a-owner" placeholder="Who" list="owners" maxlength="60">
+        <select id="a-funnel"><option value="">Any campaign</option>${d.funnels.map((f) => `<option value="${esc(f.id)}">${esc(f.name)}</option>`).join("")}</select>
+        <button class="primary" id="a-add">Add</button>
+      </div>
+      <datalist id="owners">${OWNERS.map((o) => `<option value="${esc(o)}">`).join("")}</datalist>
+      <div class="msg err" id="a-msg"></div>
     </div>
-    <datalist id="owners">${OWNERS.map((o) => `<option value="${esc(o)}">`).join("")}</datalist>
-    <div class="msg err" id="a-msg"></div>
   </div>`;
 }
 
-function howCard() {
-  return `<div class="foot" id="how"><b>How the numbers work</b><ul>
-    <li>Everything covers the last 7 days unless it says "since launch". The page rebuilds itself every hour; "Refresh now" rebuilds it straight away (about 10 minutes).</li>
-    <li>Real replies leave out out-of-office replies, bounces, and "wrong person" replies. Interested means tagged Interested, Information Request, Meeting Request or moved to the CRM, by us in the inbox or by the email platform's AI.</li>
-    <li>Our reply time is how long an interested person waited for our first answer (last 90 days). People we never answered count with the time they've waited so far.</li>
-    <li>"Failed in our own mailboxes" are bounces caused by our sending accounts, not by bad addresses.</li>
-    <li>Demos: LinkedIn conversations tagged Demo Booked, Demo Given or Demo Not Given that moved in the last 7 days, plus email replies tagged Meeting Request. Zoho isn't connected yet.</li>
-    <li>Verdicts use fixed benchmarks, so the same numbers always get the same verdict. The worst miss decides the colour and the "Why".</li>
-  </ul></div>`;
+function howSection() {
+  return `<div class="section"><details class="foot"><summary>How these numbers are worked out</summary><ul>
+    <li>Everything covers the last 7 days unless it says "since the start". The page updates itself every hour; "Update now" does it straight away (it takes about 10 minutes).</li>
+    <li>"Replied" leaves out out-of-office and "wrong person" replies. "Interested" means the reply was tagged Interested, Information Request, Meeting Request or moved to the CRM.</li>
+    <li>"How fast we answer" is how long an interested person waited for our first reply. People we never answered count with the time they've waited so far.</li>
+    <li>"Emails our mailboxes failed to send" are bounces caused by our own sending accounts, not by bad addresses.</li>
+    <li>Demos come from LinkedIn chats tagged Demo Booked, Demo Given or Demo Not Given this week, plus email replies asking for a meeting. Zoho isn't connected yet.</li>
+    <li>Each campaign's colour comes from fixed targets, so the same numbers always get the same colour. The worst miss decides the colour and the "what's wrong" line.</li>
+  </ul></details></div>`;
 }
 
 function bindActions() {
@@ -531,7 +559,7 @@ function bindActions() {
   if (add) add.onclick = () => {
     const text = document.getElementById("a-text").value.trim();
     const msg = document.getElementById("a-msg");
-    if (!text) { msg.textContent = "Write the action first."; return; }
+    if (!text) { msg.textContent = "Write what needs doing first."; return; }
     msg.textContent = "";
     action({ op: "add", text, owner: document.getElementById("a-owner").value.trim(), funnel_id: document.getElementById("a-funnel").value });
   };
@@ -541,7 +569,7 @@ function bindActions() {
 
 // ---------- boot ----------
 // Local preview only: ?preview=<file.json> on localhost renders a saved payload
-// without signing in. Ignored on the live site.
+// without signing in and never calls the live API. Ignored on the live site.
 async function boot() {
   const pv = new URLSearchParams(location.search).get("preview");
   if (pv && /^(localhost|127\.0\.0\.1)$/.test(location.hostname)) {
