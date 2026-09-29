@@ -111,7 +111,7 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 });
 
 const $root = document.getElementById("root");
-let DATA = null, SESSION = null, POLL = null, BUSY = false;
+let DATA = null, SESSION = null, POLL = null, BUSY = false, PREVIEW = false;
 
 // ---------- formatting ----------
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -164,6 +164,7 @@ async function api(path, body) {
 }
 
 async function load(quiet) {
+  if (PREVIEW) return;
   try {
     DATA = await api("/api/review");
     renderApp();
@@ -184,6 +185,7 @@ function schedulePoll() {
 document.addEventListener("visibilitychange", () => { if (!document.hidden && SESSION && DATA) load(true); });
 
 async function refreshNow() {
+  if (PREVIEW) return alert("Preview only: nothing is sent.");
   if (BUSY) return; BUSY = true;
   try { await api("/api/refresh", {}); await load(true); }
   catch (e) { if (e.message !== "signed out" && e.message !== "denied") alert(e.message); }
@@ -191,6 +193,7 @@ async function refreshNow() {
 }
 
 async function action(body) {
+  if (PREVIEW) return alert("Preview only: nothing is saved.");
   try { await api("/api/actions", body); await load(true); }
   catch (e) { if (e.message !== "signed out" && e.message !== "denied") alert(e.message); }
 }
@@ -538,7 +541,8 @@ function bindActions() {
 async function boot() {
   const pv = new URLSearchParams(location.search).get("preview");
   if (pv && /^(localhost|127\.0\.0\.1)$/.test(location.hostname)) {
-    DATA = await fetch(pv).then((r) => r.json());
+    PREVIEW = true;
+    DATA = await fetch(pv, { cache: "no-store" }).then((r) => r.json());
     SESSION = { access_token: "preview" };
     renderApp();
     return;
