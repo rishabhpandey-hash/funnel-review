@@ -243,34 +243,44 @@ function renderSignIn(message, isError) {
         <label class="small muted" for="em">Email</label>
         <input id="em" type="email" autocomplete="email" placeholder="name@edbound.ai">
         <button class="primary" id="send">Email me a sign-in link</button>
-        <div id="codebox" style="display:none">
-          <label class="small muted" for="code" style="display:block;margin-top:14px">Or type the 6-digit code from the email</label>
-          <input id="code" inputmode="numeric" autocomplete="one-time-code" placeholder="123456">
-          <button id="verify">Sign in with code</button>
-        </div>
         <div class="msg ${isError ? "err" : ""}" id="msg">${esc(message || "")}</div>
       </div>
     </div>`;
-  const em = document.getElementById("em"), msg = document.getElementById("msg");
+  const em = document.getElementById("em"), msg = document.getElementById("msg"), send = document.getElementById("send");
   const setMsg = (t, err) => { msg.textContent = t; msg.className = "msg" + (err ? " err" : ""); };
   em.oninput = () => setMsg("");
-  document.getElementById("send").onclick = async () => {
+  em.onkeydown = (e) => { if (e.key === "Enter") send.click(); };
+  // Sign-in is by link only: the email has no code to type in.
+  send.onclick = async () => {
     const email = em.value.trim().toLowerCase();
-    if (!email.includes("@")) return setMsg("Enter a valid email.", true);
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return setMsg("Enter a valid email.", true);
+    send.disabled = true;
     setMsg("Sending…");
     const { error } = await sb.auth.signInWithOtp({
       email, options: { emailRedirectTo: location.origin + location.pathname, shouldCreateUser: false },
     });
-    if (error) return setMsg(error.message, true);
-    setMsg("Check your email and click the link. It opens this page, signed in.");
-    document.getElementById("codebox").style.display = "block";
+    send.disabled = false;
+    if (error) {
+      const m = String(error.message || "");
+      if (/signups not allowed|not found|not allowed/i.test(m)) return setMsg("This email doesn't have access. Ask Rishabh to add you.", true);
+      if (/security purposes|rate limit|seconds/i.test(m)) return setMsg("You just asked for a link. Wait a minute, then try again.", true);
+      return setMsg("Couldn't send the link. Try again in a minute.", true);
+    }
+    renderLinkSent(email);
   };
-  document.getElementById("verify").onclick = async () => {
-    const code = document.getElementById("code").value.trim();
-    if (!/^\d{6}$/.test(code)) return setMsg("Enter the 6-digit code.", true);
-    const { error } = await sb.auth.verifyOtp({ email: em.value.trim().toLowerCase(), token: code, type: "email" });
-    if (error) return setMsg(error.message, true);
-  };
+}
+
+function renderLinkSent(email) {
+  $root.innerHTML = `
+    <div class="center">
+      <h1>Check your email</h1>
+      <div class="card">
+        <p>We sent a sign-in link to <b>${esc(email)}</b>.</p>
+        <p class="muted" style="margin-top:10px">Open the email and click the link. It brings you back here, signed in. You can close this tab.</p>
+        <p class="small soft" style="margin-top:14px">No email after a minute? Check spam, or <a href="#" id="again">send it again</a>.</p>
+      </div>
+    </div>`;
+  document.getElementById("again").onclick = (e) => { e.preventDefault(); renderSignIn(""); document.getElementById("em").value = email; };
 }
 
 function renderDenied(email) {
