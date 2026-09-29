@@ -1,0 +1,561 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Funnel review</title>
+<!--
+  Funnel review — every outbound funnel on one page, in the order the Monday GTM
+  meeting reads them. This page holds no data: after email sign-in it asks the
+  funnel-review edge function (Supabase ops project) for everything.
+  Source of the numbers and the verdict rules: control-tower
+  backend/ops/supabase/migrations/20260929_*_funnel_review_*.sql
+-->
+<style>
+:root{
+  --bg:#f6f7f9;--card:#fff;--ink:#101828;--muted:#475467;--soft:#667085;--line:#e4e7ec;
+  --accent:#3538cd;--accent-bg:#eef4ff;
+  --red:#b42318;--red-bg:#fef3f2;--red-bar:#f04438;
+  --amber:#b54708;--amber-bg:#fffaeb;--amber-bar:#f79009;
+  --green:#067647;--green-bg:#ecfdf3;--green-bar:#17b26a;
+  --grey:#475467;--grey-bg:#f2f4f7;--grey-bar:#98a2b3;
+  --bar:#c7d7fe;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0c111d;--card:#161b26;--ink:#f5f5f6;--muted:#cecfd2;--soft:#94969c;--line:#2e3440;
+  --accent:#a4bcfd;--accent-bg:#1f2a4a;
+  --red:#fda29b;--red-bg:#3b1a17;--amber:#fec84b;--amber-bg:#3a2a0e;
+  --green:#75e0a7;--green-bg:#0e2f22;--grey:#cecfd2;--grey-bg:#262b36;--bar:#2d3a66;
+}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:20px 16px 60px}
+h1{font-size:22px;margin:0;font-weight:650}
+h2{font-size:17px;margin:0 0 4px;font-weight:650}
+h3{font-size:14px;margin:18px 0 8px;font-weight:650;color:var(--muted)}
+p{margin:0}
+button,input,select{font:inherit}
+button{cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:7px 12px}
+button:hover{border-color:var(--soft)}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button.small{padding:3px 9px;font-size:13px}
+input,select{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:8px 10px;min-width:0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin-top:14px}
+.muted{color:var(--muted)}.soft{color:var(--soft)}.small{font-size:13px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.top .right{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;color:var(--soft)}
+.nav{display:flex;gap:14px;font-size:13px;margin-top:6px;flex-wrap:wrap}
+.nav a{color:var(--accent);text-decoration:none}
+.banner{border-radius:10px;padding:10px 14px;margin-top:14px;font-size:14px}
+.banner.info{background:var(--accent-bg);color:var(--accent)}
+.banner.err{background:var(--red-bg);color:var(--red)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-top:14px}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.tile b{display:block;font-size:26px;font-weight:650;line-height:1.2}
+.tile span{font-size:13px;color:var(--muted)}
+.summary{margin-top:12px;font-size:15px}
+.fhead{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.num{display:inline-flex;width:24px;height:24px;border-radius:50%;background:var(--grey-bg);color:var(--grey);align-items:center;justify-content:center;font-size:13px;font-weight:650;margin-right:8px;flex:none}
+.pill{font-size:13px;font-weight:650;padding:4px 11px;border-radius:999px;white-space:nowrap}
+.v-red{background:var(--red-bg);color:var(--red)}.v-amber{background:var(--amber-bg);color:var(--amber)}
+.v-green{background:var(--green-bg);color:var(--green)}.v-grey{background:var(--grey-bg);color:var(--grey)}
+.card.red{border-left:5px solid var(--red-bar)}.card.amber{border-left:5px solid var(--amber-bar)}
+.card.green{border-left:5px solid var(--green-bar)}.card.grey{border-left:5px solid var(--grey-bar)}
+.verdict{margin-top:12px;display:grid;gap:6px}
+.verdict .row{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.verdict .lab{font-size:12px;font-weight:650;text-transform:uppercase;letter-spacing:.04em;color:var(--soft);width:62px;flex:none}
+.verdict .txt{flex:1;min-width:220px}
+.funnel{display:grid;gap:5px;margin-top:6px}
+.step{display:grid;grid-template-columns:minmax(0,1fr) 70px;align-items:center;gap:10px}
+.bar{background:var(--bar);border-radius:6px;padding:5px 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:190px}
+.bar b{font-weight:650;margin-right:6px}
+.step .conv{font-size:12px;color:var(--soft);text-align:right}
+.gates{display:grid;gap:6px}
+.gate{display:flex;gap:9px;align-items:baseline}
+.dot{width:10px;height:10px;border-radius:50%;flex:none;transform:translateY(1px)}
+.d-red{background:var(--red-bar)}.d-amber{background:var(--amber-bar)}.d-green{background:var(--green-bar)}.d-none{background:var(--grey-bar)}
+.insight{background:var(--accent-bg);color:var(--accent);border-radius:10px;padding:9px 12px;font-size:14px;margin-top:12px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+td,th{padding:7px 6px;border-top:1px solid var(--line);text-align:left;vertical-align:top}
+th{font-size:12px;color:var(--soft);font-weight:600;border-top:none}
+.tablewrap{overflow-x:auto}
+.act{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-top:1px solid var(--line)}
+.act:first-child{border-top:none}
+.act .t{flex:1}
+.tag{font-size:12px;background:var(--grey-bg);color:var(--grey);border-radius:6px;padding:1px 7px;margin-left:6px;white-space:nowrap}
+.addrow{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,1.2fr) minmax(0,1.5fr) auto;gap:8px;margin-top:12px}
+@media (max-width:640px){.addrow{grid-template-columns:1fr}.verdict .lab{width:auto}.bar{min-width:0}}
+.center{max-width:420px;margin:12vh auto;text-align:center}
+.center .card{text-align:left}
+.center input{width:100%;margin-top:10px}
+.center button{width:100%;margin-top:10px}
+.msg{margin-top:10px;font-size:14px}.msg.err{color:var(--red)}
+.foot{font-size:13px;color:var(--soft);margin-top:26px}
+.foot li{margin:3px 0}
+details summary{cursor:pointer;color:var(--accent);font-size:14px;margin-top:12px}
+</style>
+</head>
+<body>
+<div class="wrap" id="root"><p class="soft" style="margin-top:20vh;text-align:center">Loading…</p></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>
+const SUPABASE_URL = "https://mgnjlymtjmcoskqinhid.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1nbmpseW10am1jb3NrcWluaGlkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyMzMxOTMsImV4cCI6MjEwMDgwOTE5M30.bFMe8wltqHkB7esG_eAYKhU20n2sjPSPp6cEmFoCrco";
+const API = SUPABASE_URL + "/functions/v1/funnel-review";
+const OWNERS = ["Rishabh", "Kinner", "Subhashree", "Longjam", "George", "Shubhangi", "Nisha", "Naveen", "Sagar"];
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: { flowType: "implicit", detectSessionInUrl: true, persistSession: true },
+});
+
+const $root = document.getElementById("root");
+let DATA = null, SESSION = null, POLL = null, BUSY = false;
+
+// ---------- formatting ----------
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const n = (v) => (v == null || v === "" || isNaN(Number(v)) ? null : Number(v));
+const fmt = (v) => (n(v) == null ? "–" : Math.round(n(v)).toLocaleString("en-IN"));
+function pct(v) {
+  v = n(v); if (v == null) return "–";
+  const d = Math.abs(v) < 1 ? 2 : 1;
+  return v.toFixed(d).replace(/\.?0+$/, "") + "%";
+}
+function hrs(v) {
+  v = n(v); if (v == null) return "–";
+  const h = Math.round(v);
+  return h >= 48 ? `${h} h (about ${Math.round(h / 24)} days)` : `${h} h`;
+}
+function ago(ts) {
+  if (!ts) return "never";
+  const m = Math.round((Date.now() - new Date(ts).getTime()) / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m} min ago`;
+  const h = Math.round(m / 60);
+  return h < 24 ? `${h} h ago` : `${Math.round(h / 24)} days ago`;
+}
+function day(d) {
+  if (!d) return "";
+  return new Date(d + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+}
+const VERDICT = { red: "Not working", amber: "Watch", green: "Working" };
+function verdictLabel(f) {
+  if (f.verdict !== "grey") return VERDICT[f.verdict] || "No data";
+  if (f.status === "launching") return "Not started";
+  if (f.metrics && f.metrics.kind === "linkedin" && f.metrics.connected === 0) return "Not connected";
+  if (f.metrics && f.metrics.error) return "Could not load";
+  return "Too early";
+}
+
+// ---------- API ----------
+async function api(path, body) {
+  const opts = { headers: { Authorization: "Bearer " + SESSION.access_token } };
+  if (body !== undefined) { opts.method = "POST"; opts.headers["Content-Type"] = "application/json"; opts.body = JSON.stringify(body); }
+  let res;
+  try { res = await fetch(API + path, opts); }
+  catch { throw new Error("Couldn't reach the dashboard server. Check your connection and try again."); }
+  if (res.status === 404 && path === "/api/review") throw new Error("The dashboard server isn't live yet.");
+  const out = await res.json().catch(() => ({}));
+  if (res.status === 401) { await signOut("Your session expired. Sign in again."); throw new Error("signed out"); }
+  if (res.status === 403) { renderDenied(out.email); throw new Error("denied"); }
+  if (!res.ok) throw new Error(out.error || `Request failed (${res.status})`);
+  return out;
+}
+
+async function load(quiet) {
+  try {
+    DATA = await api("/api/review");
+    renderApp();
+    schedulePoll();
+  } catch (e) {
+    if (e.message === "signed out" || e.message === "denied") return;
+    if (!quiet || !DATA) renderError(e.message);
+  }
+}
+
+function schedulePoll() {
+  clearTimeout(POLL);
+  // Poll quickly while a refresh is running; otherwise refresh the view every 5 min
+  // (the data itself is rebuilt hourly in the background).
+  const wait = DATA && DATA.refreshing ? 15000 : 300000;
+  POLL = setTimeout(() => { if (!document.hidden) load(true); else schedulePoll(); }, wait);
+}
+document.addEventListener("visibilitychange", () => { if (!document.hidden && SESSION && DATA) load(true); });
+
+async function refreshNow() {
+  if (BUSY) return; BUSY = true;
+  try { await api("/api/refresh", {}); await load(true); }
+  catch (e) { if (e.message !== "signed out" && e.message !== "denied") alert(e.message); }
+  finally { BUSY = false; }
+}
+
+async function action(body) {
+  try { await api("/api/actions", body); await load(true); }
+  catch (e) { if (e.message !== "signed out" && e.message !== "denied") alert(e.message); }
+}
+
+// ---------- sign in ----------
+function renderSignIn(message, isError) {
+  $root.innerHTML = `
+    <div class="center">
+      <h1>Funnel review</h1>
+      <p class="muted" style="margin-top:6px">Sign in with your work email.</p>
+      <div class="card">
+        <label class="small muted" for="em">Email</label>
+        <input id="em" type="email" autocomplete="email" placeholder="name@edbound.ai">
+        <button class="primary" id="send">Email me a sign-in link</button>
+        <div id="codebox" style="display:none">
+          <label class="small muted" for="code" style="display:block;margin-top:14px">Or type the 6-digit code from the email</label>
+          <input id="code" inputmode="numeric" autocomplete="one-time-code" placeholder="123456">
+          <button id="verify">Sign in with code</button>
+        </div>
+        <div class="msg ${isError ? "err" : ""}" id="msg">${esc(message || "")}</div>
+      </div>
+    </div>`;
+  const em = document.getElementById("em"), msg = document.getElementById("msg");
+  const setMsg = (t, err) => { msg.textContent = t; msg.className = "msg" + (err ? " err" : ""); };
+  document.getElementById("send").onclick = async () => {
+    const email = em.value.trim().toLowerCase();
+    if (!email.includes("@")) return setMsg("Enter a valid email.", true);
+    setMsg("Sending…");
+    const { error } = await sb.auth.signInWithOtp({
+      email, options: { emailRedirectTo: location.origin + location.pathname, shouldCreateUser: false },
+    });
+    if (error) return setMsg(error.message, true);
+    setMsg("Check your email and click the link. It opens this page, signed in.");
+    document.getElementById("codebox").style.display = "block";
+  };
+  document.getElementById("verify").onclick = async () => {
+    const code = document.getElementById("code").value.trim();
+    if (!/^\d{6}$/.test(code)) return setMsg("Enter the 6-digit code.", true);
+    const { error } = await sb.auth.verifyOtp({ email: em.value.trim().toLowerCase(), token: code, type: "email" });
+    if (error) return setMsg(error.message, true);
+  };
+}
+
+function renderDenied(email) {
+  $root.innerHTML = `
+    <div class="center"><h1>Funnel review</h1>
+      <div class="card"><p><b>${esc(email || "This email")}</b> doesn't have access to this dashboard.</p>
+      <p class="muted small" style="margin-top:8px">Ask Rishabh to add you.</p>
+      <button id="out" style="margin-top:14px">Sign in with a different email</button></div></div>`;
+  document.getElementById("out").onclick = () => signOut("");
+}
+
+function renderError(text) {
+  $root.innerHTML = `<div class="center"><h1>Funnel review</h1>
+    <div class="banner err">${esc(text)}</div>
+    <button id="retry" style="margin-top:12px">Try again</button></div>`;
+  document.getElementById("retry").onclick = () => load();
+}
+
+async function signOut(note) {
+  clearTimeout(POLL);
+  await sb.auth.signOut().catch(() => {});
+  SESSION = null; DATA = null;
+  renderSignIn(note);
+}
+
+// ---------- page ----------
+function summary(d) {
+  let emails = 0, liMsgs = 0, liInv = 0, interested = 0, demos = 0, meetings = 0, waitingEmail = 0, waitingLi = 0, humanEmail = 0, liReplied = 0;
+  for (const f of d.funnels) {
+    const m = f.metrics || {};
+    if (m.kind === "email") {
+      emails += n(m.week?.sent) || 0; interested += n(m.week?.positive) || 0; meetings += n(m.week?.meetings) || 0;
+      humanEmail += n(m.week?.human) || 0; waitingEmail += (m.waiting || []).length;
+    } else if (m.kind === "linkedin") {
+      liMsgs += n(m.week?.messages) || 0; liInv += n(m.week?.invites) || 0; demos += n(m.week?.demos) || 0;
+      liReplied += n(m.week?.people_replied) || 0; waitingLi += n(m.now?.waiting_48h) || 0;
+    }
+  }
+  return { emails, liMsgs, liInv, interested, demos: demos + meetings, waitingEmail, waitingLi, humanEmail, liReplied };
+}
+
+function renderApp() {
+  const d = DATA;
+  const s = summary(d);
+  const target = n(d.demos_target) || 5;
+  const w = d.window || {};
+  const refreshing = d.refreshing
+    ? `<div class="banner info">Refreshing: ${fmt(d.refreshing.total - d.refreshing.left)} of ${fmt(d.refreshing.total)} numbers are in. This page updates by itself when it's done (about 10 minutes).</div>`
+    : "";
+  const never = !d.built_at
+    ? `<div class="banner info">The first numbers are still being collected. Give it about 10 minutes.</div>` : "";
+
+  $root.innerHTML = `
+    <div class="top">
+      <div><h1>Outbound funnels</h1>
+        <div class="nav"><a href="#funnels">Funnels</a><a href="#waiting">Waiting for us</a><a href="#actions">Actions</a><a href="#how">How the numbers work</a></div>
+      </div>
+      <div class="right">
+        <span title="${esc(d.built_at || "")}">Updated ${esc(ago(d.built_at))}</span>
+        <button class="small" id="refresh" ${d.refreshing ? "disabled" : ""}>${d.refreshing ? "Refreshing…" : "Refresh now"}</button>
+        <span>${esc(d.me?.email || "")}</span>
+        <button class="small" id="signout">Sign out</button>
+      </div>
+    </div>
+    ${refreshing}${never}
+    ${d.built_at ? `
+    <div class="tiles">
+      <div class="tile"><b>${fmt(s.emails)}</b><span>emails sent in the last 7 days</span></div>
+      <div class="tile"><b>${fmt(s.liInv)} / ${fmt(s.liMsgs)}</b><span>LinkedIn invitations / messages sent</span></div>
+      <div class="tile"><b>${fmt(s.interested)}</b><span>interested email replies</span></div>
+      <div class="tile"><b>${fmt(s.demos)} <small class="soft" style="font-size:15px">of ${fmt(target)}</small></b><span>demos booked (target ${fmt(target)} a week)</span></div>
+    </div>
+    <p class="summary">From <b>${esc(day(w.start))}</b> to <b>${esc(day(w.end))}</b> we sent ${fmt(s.emails)} cold emails and ${fmt(s.liMsgs)} LinkedIn messages.
+      ${fmt(s.humanEmail)} people wrote back to an email for real, ${fmt(s.interested)} of them interested, and ${fmt(s.liReplied)} replied on LinkedIn.
+      ${s.waitingEmail + s.waitingLi > 0 ? `<b>${fmt(s.waitingEmail + s.waitingLi)} people are waiting for us to reply.</b>` : "Nobody is waiting for a reply."}</p>` : ""}
+
+    <div id="funnels">${d.funnels.map(funnelCard).join("")}</div>
+    ${waitingCard(d)}
+    ${actionsCard(d)}
+    ${howCard()}`;
+
+  document.getElementById("refresh").onclick = refreshNow;
+  document.getElementById("signout").onclick = () => signOut("Signed out.");
+  bindActions();
+}
+
+function funnelCard(f) {
+  const m = f.metrics || {};
+  const cls = f.verdict || "grey";
+  const head = `
+    <div class="fhead">
+      <div style="display:flex;align-items:flex-start"><span class="num">${esc(f.position)}</span>
+        <div><h2>${esc(f.name)} <span class="tag">${f.channel === "email" ? "Email" : "LinkedIn"}</span></h2>
+        ${f.note && f.note !== f.reason ? `<p class="small muted">${esc(f.note)}</p>` : ""}</div></div>
+      <span class="pill v-${esc(cls)}">${esc(verdictLabel(f))}</span>
+    </div>
+    <div class="verdict">
+      <div class="row"><span class="lab">Why</span><span class="txt">${esc(f.reason || "No numbers yet.")}</span></div>
+      ${f.action ? `<div class="row"><span class="lab">Do this</span><span class="txt"><b>${esc(f.action)}</b>
+        <button class="small" data-add="${esc(f.id)}" data-text="${esc(f.action)}" style="margin-left:6px">+ Add to actions</button></span></div>` : ""}
+    </div>`;
+  if (!f.verdict) return `<div class="card grey">${head}</div>`;
+  if (m.kind === "email") return `<div class="card ${esc(cls)}">${head}${emailBody(f, m)}</div>`;
+  if (m.kind === "linkedin") return `<div class="card ${esc(cls)}">${head}${linkedinBody(f, m)}</div>`;
+  return `<div class="card ${esc(cls)}">${head}</div>`;
+}
+
+// Each step: { v, one, many }; the label follows the count ("1 person replied").
+// noConv marks a step that isn't a subset of the one above, so a % would mislead.
+function funnelSteps(steps) {
+  const widths = [100, 86, 72, 58, 46, 36];
+  return `<div class="funnel">${steps.map((st, i) => {
+    const prev = i > 0 ? n(steps[i - 1].v) : null;
+    const conv = i > 0 && prev && !st.noConv ? pct((100 * (n(st.v) || 0)) / prev) : "";
+    const label = n(st.v) === 1 ? st.one : st.many;
+    return `<div class="step"><div class="bar" style="width:${widths[i] || 30}%"><b>${fmt(st.v)}</b>${esc(label)}</div>
+      <span class="conv">${conv ? esc(conv) : ""}</span></div>`;
+  }).join("")}</div>`;
+}
+
+function gateList(gates) {
+  return `<div class="gates">${(gates || []).filter(Boolean).map((g) => {
+    const unit = g.metric.endsWith("_pct") ? "%" : g.metric === "reply_speed_h" ? " h" : "";
+    const val = g.value == null ? "not enough data yet"
+      : g.metric.endsWith("_pct") ? pct(g.value) : g.metric === "reply_speed_h" ? hrs(g.value) : fmt(g.value);
+    const good = g.higher_is_better ? `${fmtNum(g.good)}${unit} or more` : (Number(g.good) === 0 ? "none" : `${fmtNum(g.good)}${unit} or less`);
+    return `<div class="gate"><span class="dot d-${esc(g.colour || "none")}"></span>
+      <span><b>${esc(g.label)}:</b> ${esc(val)}. <span class="soft">Good is ${esc(good)} · ${esc(g.basis)}</span></span></div>`;
+  }).join("")}</div>`;
+}
+const fmtNum = (v) => String(Number(v));
+
+function trend(now, before, word) {
+  now = n(now) || 0; before = n(before) || 0;
+  if (now === before) return `same ${word} as the 7 days before (${fmt(before)})`;
+  return `${now > before ? "up" : "down"} from ${fmt(before)} the 7 days before`;
+}
+
+function emailBody(f, m) {
+  const wk = m.week || {}, pv = m.prev || {}, life = m.life || {}, sp = m.speed || {};
+  const steps = [
+    { v: wk.sent, one: "email sent", many: "emails sent" },
+    { v: wk.replies, one: "reply of any kind", many: "replies of any kind" },
+    { v: wk.human, one: "real reply (not an auto-reply or 'wrong person')", many: "real replies (not auto-replies or 'wrong person')" },
+    { v: wk.positive, one: "interested", many: "interested" },
+    { v: wk.meetings, one: "asked for a meeting", many: "asked for a meeting" },
+  ];
+  const insights = [];
+  if (n(life.left_org) >= 10) insights.push(`Of ${fmt(life.wrong_person)} "wrong person" replies, ${fmt(life.left_org)} say the contact has left and ${fmt(life.names_other)} give another email address, often whoever took over. That's a free list of the right people.`);
+  if (n(sp.unanswered) > 0) insights.push(`${fmt(sp.unanswered)} interested ${n(sp.unanswered) === 1 ? "person has" : "people have"} never had a reply from us.`);
+  if (n(life.not_started) > 0) insights.push(`${fmt(life.not_started)} leads in these campaigns haven't been emailed yet.`);
+  return `
+    <h3>Last 7 days</h3>
+    ${funnelSteps(steps)}
+    <p class="small soft" style="margin-top:6px">Real replies: ${esc(trend(wk.human, pv.human, "number"))}. Interested: ${esc(trend(wk.positive, pv.positive, "number"))}.
+      ${n(wk.bounces) ? `Bounced: ${fmt(wk.bounces)}, of which ${fmt(wk.our_bounces)} failed in our own mailboxes.` : ""}</p>
+    <h3>Against the benchmarks (since launch: ${fmt(life.contacted)} people emailed)</h3>
+    ${gateList(m.gates)}
+    ${insights.map((t) => `<div class="insight">${esc(t)}</div>`).join("")}
+    <details><summary>Campaigns in this funnel (${(m.campaigns || []).length})</summary>
+      <div class="tablewrap"><table>
+        <tr><th>Campaign</th><th>Emailed since launch</th><th>Last 7 days</th><th>Interested since launch</th></tr>
+        ${(m.campaigns || []).map((c) => `<tr>
+          <td>${esc(c.name)}<div class="small soft">${esc((c.status || "").toLowerCase())}${c.loaded === false ? " · some numbers didn't load" : ""}</div></td>
+          <td>${fmt(c.contacted)}${n(c.not_started) ? `<div class="small soft">${fmt(c.not_started)} not emailed yet</div>` : ""}</td>
+          <td>${fmt(c.sent_7d)} sent · ${fmt(c.human_7d)} real replies · ${fmt(c.positive_7d)} interested</td>
+          <td>${pct(c.positive_pct)}<div class="small soft">real replies ${pct(c.human_pct)} · bad addresses ${pct(c.hard_bounce_pct)}</div></td></tr>`).join("")}
+      </table></div>
+    </details>
+    ${failedNote(m)}`;
+}
+
+function linkedinBody(f, m) {
+  if (f.status === "launching") return "";
+  const wk = m.week || {}, now = m.now || {};
+  const connected = (m.campaigns || []).filter((c) => c.connected);
+  const missing = (m.campaigns || []).filter((c) => !c.connected);
+  const missNote = missing.length
+    ? `<div class="insight">Not connected yet: ${missing.map((c) => esc(c.name)).join(", ")}. Map ${missing.length === 1 ? "it" : "them"} in the LinkedIn inbox admin panel to include ${missing.length === 1 ? "it" : "them"} here.</div>` : "";
+  if (!connected.length) return missNote;
+  const steps = [
+    { v: wk.invites, one: "invitation sent", many: "invitations sent" },
+    { v: wk.accepted, one: "accepted", many: "accepted" },
+    // Messages also go to people who accepted weeks ago, so no % against "accepted".
+    { v: wk.messages, one: "message sent", many: "messages sent", noConv: true },
+    { v: wk.people_replied, one: "person replied", many: "people replied" },
+    { v: wk.demos, one: "demo booked or held", many: "demos booked or held" },
+  ];
+  const senders = [];
+  for (const c of connected) for (const s of c.senders || []) senders.push({ ...s, campaign: c.name });
+  return `
+    <h3>Last 7 days</h3>
+    ${funnelSteps(steps)}
+    <p class="small soft" style="margin-top:6px">Right now: ${fmt(now.awaiting)} replies are waiting for us, ${fmt(now.waiting_48h)} of them for more than 2 days. ${fmt(now.leads)} leads are in these campaigns.</p>
+    <h3>Against the benchmarks</h3>
+    ${gateList(m.gates)}
+    ${missNote}
+    ${senders.length ? `<details><summary>By sending profile (${senders.length})</summary><div class="tablewrap"><table>
+      <tr><th>Profile</th><th>Waiting for us</th><th>Our average reply time</th><th>Conversations</th></tr>
+      ${senders.sort((a, b) => (n(b.awaiting) || 0) - (n(a.awaiting) || 0)).map((s) => `<tr><td>${esc(s.name)}${connected.length > 1 ? `<div class="small soft">${esc(s.campaign)}</div>` : ""}</td>
+        <td>${fmt(s.awaiting)}</td><td>${esc(s.avg_response || "–")}</td><td>${fmt(s.conversations)}</td></tr>`).join("")}
+    </table></div></details>` : ""}
+    ${failedNote(m)}`;
+}
+
+function failedNote(m) {
+  const failed = (m.failed || []).filter((x) => !String(x.kind).startsWith("li_") || !/No campaign in scope/.test(x.error || ""));
+  if (!failed.length) return "";
+  return `<p class="small soft" style="margin-top:10px">${failed.length} number${failed.length === 1 ? "" : "s"} couldn't be loaded on the last refresh, so some figures may be low. Refresh to try again.</p>`;
+}
+
+function waitingCard(d) {
+  const email = [], li = [];
+  const names = {};
+  let liTotal = 0;
+  for (const f of d.funnels) for (const c of f.metrics?.campaigns || []) if (c.id) names[c.id] = c.name;
+  for (const f of d.funnels) {
+    const m = f.metrics || {};
+    if (m.kind === "email") for (const x of m.waiting || []) email.push({ ...x, funnel: f.name });
+    if (m.kind === "linkedin") {
+      liTotal += n(m.now?.waiting_48h) || 0;
+      for (const x of m.waiting || []) li.push({ ...x, funnel: f.name });
+    }
+  }
+  email.sort((a, b) => (n(b.waiting_h) || 0) - (n(a.waiting_h) || 0));
+  // Most recent first: someone who wrote 3 days ago is still worth answering; a
+  // thread that has waited six months mostly isn't.
+  li.sort((a, b) => (n(a.waiting_h) || 0) - (n(b.waiting_h) || 0));
+  const liOld = li.filter((x) => n(x.waiting_h) > 30 * 24).length;
+  return `<div class="card" id="waiting">
+    <h2>Waiting for us to reply</h2>
+    <p class="small muted">People who wrote back and haven't heard from us. Email: interested or not yet tagged, last 30 days. LinkedIn: waiting more than 2 days.</p>
+    ${email.length ? `<h3>Email (${email.length})</h3><div class="tablewrap"><table>
+      <tr><th>Who</th><th>Campaign</th><th>Tagged as</th><th>Waiting</th></tr>
+      ${email.map((x) => `<tr><td>${esc(x.name)}<div class="small soft">${esc(x.email)}</div></td><td>${esc(names[x.campaign_id] || x.funnel)}</td>
+        <td>${esc(x.category)}</td><td>${esc(hrs(x.waiting_h))}</td></tr>`).join("")}</table></div>` : `<p style="margin-top:10px">No email replies are waiting.</p>`}
+    ${li.length ? `<h3>LinkedIn (${fmt(Math.max(liTotal, li.length))})</h3><div class="tablewrap"><table>
+      <tr><th>Who</th><th>Sent from</th><th>Campaign</th><th>Waiting</th></tr>
+      ${li.slice(0, 25).map((x) => `<tr><td>${esc(x.name)}${x.company ? `<div class="small soft">${esc(x.company)}</div>` : ""}</td><td>${esc(x.sender)}</td>
+        <td>${esc(x.campaign)}</td><td>${esc(hrs(x.waiting_h))}</td></tr>`).join("")}</table></div>
+      <p class="small soft" style="margin-top:6px">Most recent first${li.length > 25 ? `, showing 25 of ${fmt(Math.max(liTotal, li.length))}` : ""}.${liOld ? ` ${fmt(liOld)} of the ones loaded have waited more than 30 days and are probably cold.` : ""} The LinkedIn inbox has the full list.</p>` : `<p style="margin-top:10px">No LinkedIn replies are waiting more than 2 days.</p>`}
+  </div>`;
+}
+
+function actionsCard(d) {
+  const funnels = Object.fromEntries(d.funnels.map((f) => [f.id, f.name]));
+  const open = d.actions.filter((a) => a.status === "open");
+  const week = Date.now() - 7 * 864e5;
+  const done = d.actions.filter((a) => a.status !== "open" && new Date(a.done_at || a.created_at).getTime() >= week);
+  const row = (a) => `<div class="act">
+      <div class="t">${esc(a.text)}${a.funnel_id ? `<span class="tag">${esc(funnels[a.funnel_id] || a.funnel_id)}</span>` : ""}
+        <div class="small soft">${a.owner ? `Owner: ${esc(a.owner)} · ` : ""}${a.status === "open" ? `added ${esc(ago(a.created_at))}` : `${a.status === "done" ? "done" : "dropped"} ${esc(ago(a.done_at))}`}</div></div>
+      ${a.status === "open"
+        ? `<button class="small" data-status="done" data-id="${esc(a.id)}">Done</button><button class="small" data-status="dropped" data-id="${esc(a.id)}">Drop</button>`
+        : `<button class="small" data-status="open" data-id="${esc(a.id)}">Reopen</button>`}
+    </div>`;
+  return `<div class="card" id="actions">
+    <h2>Actions</h2>
+    <p class="small muted">What we agreed to do. Tick them off as they're done; the meeting starts with what got done in the last 7 days.</p>
+    <h3>Done in the last 7 days (${done.length})</h3>
+    ${done.length ? done.map(row).join("") : `<p class="soft">Nothing marked done yet.</p>`}
+    <h3>Lined up (${open.length})</h3>
+    ${open.length ? open.map(row).join("") : `<p class="soft">No open actions. Add one below, or use "+ Add to actions" on a funnel.</p>`}
+    <div class="addrow">
+      <input id="a-text" placeholder="What needs doing" maxlength="500">
+      <input id="a-owner" placeholder="Owner" list="owners" maxlength="60">
+      <select id="a-funnel"><option value="">No funnel</option>${d.funnels.map((f) => `<option value="${esc(f.id)}">${esc(f.name)}</option>`).join("")}</select>
+      <button class="primary" id="a-add">Add</button>
+    </div>
+    <datalist id="owners">${OWNERS.map((o) => `<option value="${esc(o)}">`).join("")}</datalist>
+    <div class="msg err" id="a-msg"></div>
+  </div>`;
+}
+
+function howCard() {
+  return `<div class="foot" id="how"><b>How the numbers work</b><ul>
+    <li>Everything covers the last 7 days unless it says "since launch". The page rebuilds itself every hour; "Refresh now" rebuilds it straight away (about 10 minutes).</li>
+    <li>Real replies leave out out-of-office replies, bounces, and "wrong person" replies. Interested means tagged Interested, Information Request, Meeting Request or moved to the CRM, by us in the inbox or by the email platform's AI.</li>
+    <li>Our reply time is how long an interested person waited for our first answer (last 90 days). People we never answered count with the time they've waited so far.</li>
+    <li>"Failed in our own mailboxes" are bounces caused by our sending accounts, not by bad addresses.</li>
+    <li>Demos: LinkedIn conversations tagged Demo Booked, Demo Given or Demo Not Given that moved in the last 7 days, plus email replies tagged Meeting Request. Zoho isn't connected yet.</li>
+    <li>Verdicts use fixed benchmarks, so the same numbers always get the same verdict. The worst miss decides the colour and the "Why".</li>
+  </ul></div>`;
+}
+
+function bindActions() {
+  document.querySelectorAll("[data-add]").forEach((b) => b.onclick = () => action({ op: "add", text: b.dataset.text, funnel_id: b.dataset.add }));
+  document.querySelectorAll("[data-status]").forEach((b) => b.onclick = () => action({ op: "status", id: b.dataset.id, status: b.dataset.status }));
+  const add = document.getElementById("a-add");
+  if (add) add.onclick = () => {
+    const text = document.getElementById("a-text").value.trim();
+    const msg = document.getElementById("a-msg");
+    if (!text) { msg.textContent = "Write the action first."; return; }
+    msg.textContent = "";
+    action({ op: "add", text, owner: document.getElementById("a-owner").value.trim(), funnel_id: document.getElementById("a-funnel").value });
+  };
+  const t = document.getElementById("a-text");
+  if (t) t.oninput = () => { document.getElementById("a-msg").textContent = ""; };
+}
+
+// ---------- boot ----------
+// Local preview only: ?preview=<file.json> on localhost renders a saved payload
+// without signing in. Ignored on the live site.
+async function boot() {
+  const pv = new URLSearchParams(location.search).get("preview");
+  if (pv && /^(localhost|127\.0\.0\.1)$/.test(location.hostname)) {
+    DATA = await fetch(pv).then((r) => r.json());
+    SESSION = { access_token: "preview" };
+    renderApp();
+    return;
+  }
+  sb.auth.onAuthStateChange((_e, session) => {
+    if (session && !SESSION) { SESSION = session; history.replaceState(null, "", location.pathname); load(); }
+    else if (!session && SESSION) { SESSION = null; renderSignIn(""); }
+  });
+  const { data } = await sb.auth.getSession();
+  if (data?.session) { SESSION = data.session; return load(); }
+  if (/access_token=|error_description=/.test(location.hash)) {
+    setTimeout(() => { if (!SESSION) renderSignIn("That sign-in link has expired or was already used. Request a new one.", true); }, 6000);
+    return;
+  }
+  renderSignIn("");
+}
+boot();
+</script>
+</body>
+</html>
